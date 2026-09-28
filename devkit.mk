@@ -82,10 +82,11 @@ LIMIT_MEMORY = $(shell $(GIT_CONFIG_GET) devkit.limit-memory || echo 0)
 
 CHECK_UPGRADE = $(shell $(GIT_CONFIG_GET) devkit.check-upgrade || echo true)
 
-BUILD_COMMAND = $(shell $(GIT_CONFIG_GET)     devkit.build-command)
+BUILD_COMMAND = $(shell $(GIT_CONFIG_GET_ALL) devkit.build-command | sed -e 's,$$,; ,g')
 BUILD_VOLUMES = $(shell $(GIT_CONFIG_GET_ALL) devkit.build-volumes)
 BUILD_ID      = $(shell $(GIT_CONFIG_GET)     devkit.build-id || echo none)
-BUILD_COMMAND_HASH = $(shell $(GIT_CONFIG_GET) devkit.build-command 2>/dev/null | sha256sum | cut -f1 -d\ )
+
+BUILD_COMMAND_HASH = $(shell  $(GIT_CONFIG_GET_ALL) devkit.build-command | sed -e 's,$$,; ,g' | sha256sum | cut -f1 -d\ )
 
 ifneq ($(AGENT),dummy)
 $(foreach cmd,$(SUBCMDS),$(eval $(cmd)_ENABLED = $(call get-if-true,$(shell $(GIT_CONFIG_GET) devkit.$(cmd) ||:))))
