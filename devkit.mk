@@ -5,8 +5,11 @@
 CURFILE := $(lastword $(MAKEFILE_LIST))
 PROG ?= make -f $(CURFILE) --
 VERSION = 6
-DEVKIT_HOMEURL = https://github.com/devkit-dev/devkit/releases/latest
 DEVKIT_WORKDIR = $(realpath $(dir $(CURFILE)))
+normalize-repo = $(if $(filter %/,$(1)),$(call normalize-repo,$(patsubst %/,%,$(1))),$(1))
+export DEVKIT_INSTALLED_REPO := $(call normalize-repo,$(or $(shell cat -- "$(DEVKIT_WORKDIR)/.devkit-repo" 2>/dev/null),https://github.com/devkit-dev/devkit))
+export DEVKIT_REPO := $(call normalize-repo,$(or $(DEVKIT_REPO),$(DEVKIT_INSTALLED_REPO)))
+export DEVKIT_HOMEURL = $(call normalize-repo,$(DEVKIT_REPO))/releases/latest
 
 V = $(VERBOSE)
 Q = $(if $(V),,@)
@@ -38,7 +41,7 @@ GIT_CONFIG_SET     = $(GIT) config
 endif
 
 get-if-true = $(if $(filter true yes on 1,$(1)),true)
-get-github-release = release_url="$$($(CURL) -fsSL -o /dev/null -w '%{url_effective}' '$(1)')" && printf '%s\n' "$$release_url" | sed -n 's,.*/tag/v\?,,p'
+get-github-release = release_url="$$($(CURL) -fsSL -o /dev/null -w '%{url_effective}' "$(1)")" && printf '%s\n' "$$release_url" | sed -n 's,.*/tag/v\?,,p'
 
 get-agent-release = \
 	$(if $(RELEASE_CMD),\
@@ -218,9 +221,9 @@ version:
 
 _check-devkit-version:
 	$(Q)set -e --;
-	avail_ver="`$(call get-github-release,$(DEVKIT_HOMEURL))`";
+	avail_ver="`$(call get-github-release,$$DEVKIT_HOMEURL)`";
 	echo "devkit information:";
-	echo " - release home page: $(DEVKIT_HOMEURL)";
+	echo " - release home page: $$DEVKIT_HOMEURL";
 	echo " - available version: $${avail_ver:-*unavailable*}";
 	echo " -   current version: $(VERSION)";
 
@@ -241,7 +244,7 @@ _check-dummy:
 
 _check-self-upgrade:
 	$(Q)if [ '$(CHECK_UPGRADE)' != 'false' ]; then \
-	  avail_ver="`$(call get-github-release,$(DEVKIT_HOMEURL))`"; \
+	  avail_ver="`$(call get-github-release,$$DEVKIT_HOMEURL)`"; \
 	  if [ -n "$$avail_ver" ] && [ "$$avail_ver" != "$(VERSION)" ]; then \
 	    echo "devkit: new version $$avail_ver is available (current: $(VERSION))." >&2; \
 	    echo "devkit: run \`devkit self-upgrade' to upgrade." >&2; \
@@ -368,34 +371,7 @@ list:
 	$(Q)$(PODMAN) image list --filter label=local.devkit.agent
 
 self-upgrade:
-	$(Q)set -e --;
-	avail_ver="`$(call get-github-release,$(DEVKIT_HOMEURL))`";
-	if [ "$${avail_ver}" = "$(VERSION)" ]; then
-	  echo "devkit is up to date ($(VERSION)).";
-	  exit 0;
-	fi;
-	if [ -z "$${avail_ver}" ]; then
-	  echo "devkit: unable to determine the latest version." >&2;
-	  exit 1;
-	fi;
-	bin_dir="";
-	for d in "$$HOME/bin" "$$HOME/.local/bin"; do
-	  case ":$${PATH-}:" in
-	    *:"$$d":*) bin_dir="$$d"; break ;;
-	  esac;
-	done;
-	if [ -z "$${bin_dir}" ]; then
-	  echo "devkit: error: neither $$HOME/bin nor $$HOME/.local/bin is in PATH." >&2;
-	  exit 1;
-	fi;
-	dest_dir="$$HOME/.local/share/devkit";
-	archive_url="$(DEVKIT_HOMEURL:releases/latest=archive/refs/tags/v$${avail_ver}.tar.gz)";
-	rm -rf -- "$$dest_dir";
-	mkdir -p -- "$$dest_dir";
-	$(CURL) -fsSL "$$archive_url" | tar -xzf - -C "$$dest_dir" --strip-components=1;
-	mkdir -p -- "$${bin_dir}";
-	ln -sf -- "$$dest_dir/devkit.sh" "$${bin_dir}/devkit";
-	echo "devkit upgraded: $(VERSION) -> $${avail_ver}";
+	$(Q)sh "$(DEVKIT_WORKDIR)/install.sh" --upgrade '$(VERSION)' "$$DEVKIT_INSTALLED_REPO"
 
 _container-kill:
 	$(Q)set -e --;

@@ -64,12 +64,64 @@ Required utilities:
 - `podman`
 - `curl`
 
+## Installation
+
+Install the latest release for the current user:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/devkit-dev/devkit/master/install.sh | sh
+```
+
+The installer requires `curl`, `tar`, and standard Unix utilities. Install
+`make`, `git`, `podman`, and `realpath` before running devkit.
+
+Files are installed in `~/.local/share/devkit`. The `devkit` launcher is
+linked into `~/bin` if it is in PATH, otherwise `~/.local/bin`. If neither
+directory is in PATH, the installer uses `~/.local/bin` and prints:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Add this line to your shell startup file to retain it across sessions.
+The installer does not change shell configuration or install packages.
+
+To install from a fork with published releases, set `DEVKIT_REPO` on the
+shell running the installer:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/devkit-dev/devkit/master/install.sh | DEVKIT_REPO=https://github.com/OWNER/devkit sh
+```
+
+The installer saves this repository in `.devkit-repo` inside the installed
+tree. Later installations, version checks, and self-upgrades reuse it.
+A nonempty `DEVKIT_REPO` overrides the saved repository. Installations
+without saved metadata default to `https://github.com/devkit-dev/devkit`.
+Repository URLs must support GitHub's release and tag archive endpoints.
+
+Upgrade devkit to the latest release:
+
+```sh
+devkit self-upgrade
+```
+
+Self-upgrade uses the installer's staged replacement and rollback. It
+leaves the installation unchanged when the version and repository match.
+To switch repositories, including when the version is unchanged:
+
+```sh
+DEVKIT_REPO=https://github.com/OWNER/devkit devkit self-upgrade
+```
+
+The new repository is saved only after successful installation. Running
+the installer directly always reinstalls the latest release.
+
 ## Initial Setup
 
 Initialize configuration:
 
 ```
-$ devkit.sh init
+$ devkit init
 ```
 
 ## Usage
@@ -77,32 +129,32 @@ $ devkit.sh init
 Run agent:
 
 ```
-$ devkit.sh run
+$ devkit run
 ```
 
 Open interactive shell. If the container is already running, a second session
 will be opened in the container:
 
 ```
-$ devkit.sh shell
+$ devkit shell
 ```
 
 Check available and current agent versions:
 
 ```
-$ devkit.sh check
+$ devkit check
 ```
 
 List devkit images:
 
 ```
-$ devkit.sh list
+$ devkit list
 ```
 
 Upgrade container image:
 
 ```
-$ devkit.sh upgrade
+$ devkit upgrade
 ```
 
 An upgrade checks the latest agent release. If a compatible local agent
@@ -131,7 +183,7 @@ current.
 Restore the previously used agent image:
 
 ```
-$ devkit.sh rollback
+$ devkit rollback
 ```
 
 Rollback restores the exact saved project image, including its packages
@@ -152,13 +204,13 @@ current image before replacing it, so rollback history can be retained.
 Remove images for current environment:
 
 ```
-$ devkit.sh clean
+$ devkit clean
 ```
 
 Remove all devkit images:
 
 ```
-$ devkit.sh clean-all
+$ devkit clean-all
 ```
 
 `clean` removes the selected repository/agent's current and rollback
@@ -183,11 +235,11 @@ $ git config devkit.sashiko true
 Start the service and open its CLI:
 
 ```
-$ devkit.sh sashiko
+$ devkit sashiko
 ```
 
-`devkit.sh sashiko-daemon` starts the review daemon, `devkit.sh sashiko-kill`
-stops it, and `devkit.sh sashiko-logs` shows its logs.
+`devkit sashiko-daemon` starts the review daemon, `devkit sashiko-kill`
+stops it, and `devkit sashiko-logs` shows its logs.
 
 See [Documentation/sashiko.md](Documentation/sashiko.md) for the commands,
 configuration parameters, persistent data, and service defaults.
@@ -203,7 +255,7 @@ $ git config devkit.ollama true
 Start the service if needed and execute the Ollama client:
 
 ```
-$ devkit.sh ollama
+$ devkit ollama
 ```
 
 See [Documentation/ollama.md](Documentation/ollama.md) for the commands,
