@@ -9,6 +9,15 @@ on:
     branches:
       - "master"
 jobs:
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: "Test installer"
+        run: |
+          sh -n install.sh
+          sh tests/install.sh
+
   checks:
     runs-on: ubuntu-latest
     strategy:

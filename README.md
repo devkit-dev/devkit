@@ -62,12 +62,40 @@ Required utilities:
 - `podman`
 - `curl`
 
+## Installation
+
+Install the latest release for the current user:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/devkit-dev/devkit/master/install.sh | sh
+```
+
+The installer requires `curl`, `tar`, and standard Unix utilities. Install
+`make`, `git`, `podman`, and `realpath` before running devkit.
+
+Files are installed in `~/.local/share/devkit`. The `devkit` launcher is
+linked into `~/bin` if it is in PATH, otherwise `~/.local/bin`. If neither
+directory is in PATH, the installer uses `~/.local/bin` and prints:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Add this line to your shell startup file to retain it across sessions.
+The installer does not change shell configuration or install packages.
+
+Upgrade devkit to the latest release:
+
+```sh
+devkit self-upgrade
+```
+
 ## Initial Setup
 
 Initialize configuration:
 
 ```
-$ devkit.sh init
+$ devkit init
 ```
 
 ## Usage
@@ -75,32 +103,32 @@ $ devkit.sh init
 Run agent:
 
 ```
-$ devkit.sh run
+$ devkit run
 ```
 
 Open interactive shell. If the container is already running, a second session
 will be opened in the container:
 
 ```
-$ devkit.sh shell
+$ devkit shell
 ```
 
 Check available and current agent versions:
 
 ```
-$ devkit.sh check
+$ devkit check
 ```
 
 List devkit images:
 
 ```
-$ devkit.sh list
+$ devkit list
 ```
 
 Upgrade container image:
 
 ```
-$ devkit.sh upgrade
+$ devkit upgrade
 ```
 
 An upgrade pulls the current ubuntu base image and performs a fresh build
@@ -109,13 +137,13 @@ without reusing complete images or cached intermediate layers.
 Remove images for current environment:
 
 ```
-$ devkit.sh clean
+$ devkit clean
 ```
 
 Remove all devkit images:
 
 ```
-$ devkit.sh clean-all
+$ devkit clean-all
 ```
 
 `clean` removes the current project image but retains the shared agent base.
@@ -138,11 +166,11 @@ $ git config devkit.sashiko true
 Start the service and open its CLI:
 
 ```
-$ devkit.sh sashiko
+$ devkit sashiko
 ```
 
-`devkit.sh sashiko-daemon` starts the review daemon, `devkit.sh sashiko-kill`
-stops it, and `devkit.sh sashiko-logs` shows its logs.
+`devkit sashiko-daemon` starts the review daemon, `devkit sashiko-kill`
+stops it, and `devkit sashiko-logs` shows its logs.
 
 See [Documentation/sashiko.md](Documentation/sashiko.md) for the commands,
 configuration parameters, persistent data, and service defaults.
@@ -158,7 +186,7 @@ $ git config devkit.ollama true
 Start the service if needed and execute the Ollama client:
 
 ```
-$ devkit.sh ollama
+$ devkit ollama
 ```
 
 See [Documentation/ollama.md](Documentation/ollama.md) for the commands,
