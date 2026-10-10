@@ -18,12 +18,30 @@ current compatible base exists, it pulls the latest Ubuntu image before
 building the base. All builds retain intermediate-layer caching. An
 upgrade fails if the latest agent release cannot be determined.
 
-After successfully building a new base and preparing the project image,
-upgrade cleans only replaced, unused images. Referenced older versions,
-unrelated image tags, and cached parent layers are preserved. Other
-repositories retain their existing images until explicitly upgraded.
-`clean` retains shared bases; `clean-all` removes them. Podman's
-untagged intermediate cache remains under podman cache management.
+Each repository/agent retains its previously used project image and
+base when an upgrade changes agent versions. The references are
+`localhost/devkit/<repo>:<agent>-rollback` and
+`localhost/devkit/<repo>:<agent>-rollback-base`. The retained base keeps
+its agent-version tag. These references follow actual repository usage,
+not release order or the shared `latest` tag. No-op and same-version
+upgrades preserve existing history.
+
+The `rollback` command restores the exact retained project image without
+network access or builds. Repeating rollback does not toggle versions.
+It leaves repository configuration and shared base tags unchanged.
+Subsequent runs still rebuild when configuration differs, potentially
+using the current shared base. Existing containers need restarting.
+Missing or invalid history causes rollback to fail without changing
+tags. Upgrades also fail before replacement if the outgoing image's
+agent version and exact base cannot be resolved.
+
+After preparing an upgrade, cleanup removes only replaced, unused
+images. Other repositories, rollback references, unrelated tags, and
+cached parent layers are protected. The `clean` command clears the
+selected repository/agent's current and rollback references and removes
+unused images without force. `clean-all` removes all devkit images,
+including rollback history. Podman's untagged intermediate cache remains
+under podman cache management.
 
 Inspect configuration:
 

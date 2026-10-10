@@ -6,7 +6,7 @@ _devkit()
 	local cur prev words cword
 	_init_completion -n : || return
 
-	local commands="clean clean-all list help version init check upgrade shell run exec"
+	local commands="clean clean-all list help version init check upgrade rollback shell run exec"
 	local opts="--root --agent= --agent --workdir= --workdir -h --help -V --version"
 
 	commands+=" sashiko sashiko-daemon sashiko-kill sashiko-logs"
@@ -47,7 +47,7 @@ _devkit()
 	local i cmd_seen=""
 	for ((i=1; i<COMP_CWORD; i++)); do
 		case "${COMP_WORDS[i]}" in
-			clean|clean-all|list|help|version|init|check|upgrade|shell|run)
+			clean|clean-all|list|help|version|init|check|upgrade|rollback|shell|run)
 				cmd_seen="${COMP_WORDS[i]}"
 				break
 				;;

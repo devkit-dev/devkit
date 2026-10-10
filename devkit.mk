@@ -14,7 +14,7 @@ NULL =
 SPACE = $(NULL) $(NULL)
 
 SIMPLE_GOALS = help version list clean-all self-upgrade
-PUBLIC_GOALS = $(SIMPLE_GOALS) clean init check upgrade exec shell run
+PUBLIC_GOALS = $(SIMPLE_GOALS) clean init check upgrade rollback exec shell run
 
 define require-utility
 $(eval $(1) := $(shell command -v $(2) 2>/dev/null))
@@ -186,11 +186,12 @@ help:
 	echo " list            shows all devkit known images."
 	echo " check           shows current and available agent versions."
 	echo " upgrade         upgrades podman image for current devkit."
+	echo " rollback        restores the previously used agent image."
 	echo " self-upgrade    upgrade devkit to the latest version."
 	echo " exec            run a command in the devkit container."
 	echo " shell           open a shell in the devkit container."
 	echo " run             start the configured agent."
-	echo " clean           deletes the image for the current agent."
+	echo " clean           removes current and rollback image references."
 	echo " clean-all       deletes all devkit images."
 	echo " version         output version information and exit."
 	echo " help            display this help and exit."
@@ -353,11 +354,13 @@ exec: run
 
 clean-all:
 	$(Q)set -e --;
-	$(PODMAN) image list --format '{{.Id}}' --filter 'label=local.devkit.agent' | xargs -r $(PODMAN) image rm -f
-	$(PODMAN) image list --format '{{.Id}}' --filter 'label=local.devkit.image.kind=agent-base' | xargs -r $(PODMAN) image rm -f
+	$(PODMAN) image list --format '{{.Id}}' --filter 'label=local.devkit.agent' | sort -u | xargs -r $(PODMAN) image rm -f
+	$(PODMAN) image list --format '{{.Id}}' --filter 'label=local.devkit.image.kind=agent-base' | sort -u | xargs -r $(PODMAN) image rm -f
 
-clean:
-	$(Q)$(PODMAN) image list --format '{{.Id}}' --filter 'reference=$(PODMAN_IMAGE)' | xargs -r $(PODMAN) image rm -f
+clean rollback:
+	$(Q)sh '$(DEVKIT_WORKDIR)/scripts/manage-image.sh' '$@' \
+	  '$(PODMAN)' '$(AGENT)' '$(PODMAN_AGENT_IMAGE)' '$(PODMAN_IMAGE)' \
+	  '$(PODMAN_CONTAINER)'
 
 upgrade: _create-image-$(VENDOR)
 
