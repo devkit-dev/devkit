@@ -3,17 +3,45 @@
 devkit reads these parameters from the git-config of the project for which the
 agent is started.
 
-Devkit keeps one tagged agent-base image per selected agent. It contains
-fixed packages and agent dependencies, and is shared by all repositories
-using that agent. Project packages, optional services, and custom build
-commands are added in a separate project image.
+Devkit tags agent bases as `localhost/devkit/base/<agent>:latest` and
+`localhost/devkit/base/<agent>:<version>`. Bases contain fixed packages
+and agent dependencies. Compatible repositories share them; project
+packages, optional services, and custom build commands belong to project
+images. Release strings unsuitable for image tags use a
+`version-<sha256>` tag; the original release remains in the image
+labels.
 
-Normal project builds also use podman's intermediate-layer cache. The
-`upgrade` rebuilds the selected agent base and project image without cache,
-pulling the current Ubuntu base. Existing images for other projects retain
-their embedded base until rebuilt. `clean` retains the shared agent base;
-`clean-all` removes it. Podman's untagged intermediate cache remains under
-podman cache management.
+The `upgrade` command reuses a compatible base for the latest agent
+release, then reuses or builds a matching project image. Compatibility
+includes the base recipe, devkit version, and host UID:GID. If no
+current compatible base exists, it pulls the latest Ubuntu image before
+building the base. All builds retain intermediate-layer caching. An
+upgrade fails if the latest agent release cannot be determined.
+
+Each repository/agent retains its previously used project image and
+base when an upgrade changes agent versions. The references are
+`localhost/devkit/<repo>:<agent>-rollback` and
+`localhost/devkit/<repo>:<agent>-rollback-base`. The retained base keeps
+its agent-version tag. These references follow actual repository usage,
+not release order or the shared `latest` tag. No-op and same-version
+upgrades preserve existing history.
+
+The `rollback` command restores the exact retained project image without
+network access or builds. Repeating rollback does not toggle versions.
+It leaves repository configuration and shared base tags unchanged.
+Subsequent runs still rebuild when configuration differs, potentially
+using the current shared base. Existing containers need restarting.
+Missing or invalid history causes rollback to fail without changing
+tags. Upgrades also fail before replacement if the outgoing image's
+agent version and exact base cannot be resolved.
+
+After preparing an upgrade, cleanup removes only replaced, unused
+images. Other repositories, rollback references, unrelated tags, and
+cached parent layers are protected. The `clean` command clears the
+selected repository/agent's current and rollback references and removes
+unused images without force. `clean-all` removes all devkit images,
+including rollback history. Podman's untagged intermediate cache remains
+under podman cache management.
 
 Inspect configuration:
 
