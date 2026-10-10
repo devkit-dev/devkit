@@ -10,4 +10,4 @@ READABLE_DIRS =
 SCR_ENV =
 
 RELEASE_URL = https://api2.cursor.sh/updates/download/golden/linux-x64/cursor/
-RELEASE_CMD = $(CURL) -fsSLI -o /dev/null -w '%{url_effective}' $(RELEASE_URL) | sed -n 's,.*/Cursor-\(.*\)-x86_64.AppImage,\1,p'
+RELEASE_CMD = release_url="$$($(CURL) -fsSLI -o /dev/null -w '%{url_effective}' $(RELEASE_URL))" && printf '%s\n' "$$release_url" | sed -n 's,.*/Cursor-\(.*\)-x86_64.AppImage,\1,p'

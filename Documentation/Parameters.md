@@ -3,17 +3,27 @@
 devkit reads these parameters from the git-config of the project for which the
 agent is started.
 
-Devkit keeps one tagged agent-base image per selected agent. It contains
-fixed packages and agent dependencies, and is shared by all repositories
-using that agent. Project packages, optional services, and custom build
-commands are added in a separate project image.
+Devkit tags agent bases as `localhost/devkit/base/<agent>:latest` and
+`localhost/devkit/base/<agent>:<version>`. Bases contain fixed packages
+and agent dependencies. Compatible repositories share them; project
+packages, optional services, and custom build commands belong to project
+images. Release strings unsuitable for image tags use a
+`version-<sha256>` tag; the original release remains in the image
+labels.
 
-Normal project builds also use podman's intermediate-layer cache. The
-`upgrade` rebuilds the selected agent base and project image without cache,
-pulling the current Ubuntu base. Existing images for other projects retain
-their embedded base until rebuilt. `clean` retains the shared agent base;
-`clean-all` removes it. Podman's untagged intermediate cache remains under
-podman cache management.
+The `upgrade` command reuses a compatible base for the latest agent
+release, then reuses or builds a matching project image. Compatibility
+includes the base recipe, devkit version, and host UID:GID. If no
+current compatible base exists, it pulls the latest Ubuntu image before
+building the base. All builds retain intermediate-layer caching. An
+upgrade fails if the latest agent release cannot be determined.
+
+After successfully building a new base and preparing the project image,
+upgrade cleans only replaced, unused images. Referenced older versions,
+unrelated image tags, and cached parent layers are preserved. Other
+repositories retain their existing images until explicitly upgraded.
+`clean` retains shared bases; `clean-all` removes them. Podman's
+untagged intermediate cache remains under podman cache management.
 
 Inspect configuration:
 

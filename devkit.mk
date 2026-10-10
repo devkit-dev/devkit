@@ -38,7 +38,7 @@ GIT_CONFIG_SET     = $(GIT) config
 endif
 
 get-if-true = $(if $(filter true yes on 1,$(1)),true)
-get-github-release = $(CURL) -fsSL -o /dev/null -w '%{url_effective}' '$(1)' | sed -n 's,.*/tag/v\?,,p'
+get-github-release = release_url="$$($(CURL) -fsSL -o /dev/null -w '%{url_effective}' '$(1)')" && printf '%s\n' "$$release_url" | sed -n 's,.*/tag/v\?,,p'
 
 get-agent-release = \
 	$(if $(RELEASE_CMD),\
@@ -92,7 +92,6 @@ ifneq ($(AGENT),dummy)
 $(foreach cmd,$(SUBCMDS),$(eval $(cmd)_ENABLED = $(call get-if-true,$(shell $(GIT_CONFIG_GET) devkit.$(cmd) ||:))))
 endif
 
-PODMAN_BASE_BUILD_ARGS = --layers
 PODMAN_BUILD_ARGS = --layers
 
 SHAHASH = $(shell echo \
@@ -106,11 +105,6 @@ SHAHASH = $(shell echo \
 	OLLAMA=$(ollama_ENABLED) \
 	DEVPKGS=$(sort $(DEVPKGS)) \
 	| sha256sum | cut -f1 -d\ )
-
-ifneq ($(filter upgrade,$(MAKECMDGOALS)),)
-PODMAN_BASE_BUILD_ARGS += --no-cache --pull=always
-PODMAN_BUILD_ARGS += --no-cache
-endif
 
 AGENTS_DIR = $(dir $(CURFILE))/agents
 AGENT.include = $(AGENTS_DIR)/$(AGENT).mk
@@ -168,7 +162,7 @@ PODMAN_PATH =
 
 endif # not SIMPLE_GOALS
 
-.PHONY: _create-baseimage-ubuntu _create-image-ubuntu _create_local_dirs _check-devkit-version _check-self-upgrade _check-version _check-none $(PUBLIC_GOALS)
+.PHONY: _create-image-ubuntu _create_local_dirs _check-devkit-version _check-self-upgrade _check-version _check-none $(PUBLIC_GOALS)
 .ONESHELL:
 
 MAKEFLAGS = --no-print-directory --no-builtin-rules
@@ -277,88 +271,69 @@ COREPKGS    = $(sort $(ubuntu.packages))
 AGENTPKGS   = $(sort $(filter-out $(COREPKGS),$(PACKAGES) $(ubuntu.packages.$(INST))))
 USERPKGS    = $(sort $(filter-out $(COREPKGS) $(AGENTPKGS),$(DEVPKGS)))
 
-ubuntu-install = RUN apt-get -y -q$(if $(Q),qq) update; apt-get -y -q$(if $(Q),qq) --no-install-recommends install $(1); apt-get -y -q$(if $(Q),qq) clean; rm -rf /var/lib/apt/lists/*
+# CLI verbosity must not change recipes or invalidate image caches.
+ubuntu-install = RUN apt-get -y -qqq update; apt-get -y -qqq --no-install-recommends install $(1); apt-get -y -qqq clean; rm -rf /var/lib/apt/lists/*
 
 run.install.npm = npm install -g "$(LINK)" --omit=dev && rm -rf /root/.npm /root/.cache
-run.install.pip = python3 -m venv "$(PIP_VENV)" && "$(PIP_VENV)/bin/python" -m pip install $(if $(Q),-q) --no-cache-dir "$(LINK)" && "$(PIP_VENV)/bin/python" -m pip check
+run.install.pip = python3 -m venv "$(PIP_VENV)" && "$(PIP_VENV)/bin/python" -m pip install -q --no-cache-dir "$(LINK)" && "$(PIP_VENV)/bin/python" -m pip check
 run.install.scr = curl -fsSL "$(LINK)" | $(SCR_ENV) bash
 
-_create-baseimage-ubuntu: $(if $(filter upgrade,$(MAKECMDGOALS)),clean)
-	$(Q)set -e --
-	if [ -n '$(filter upgrade,$(MAKECMDGOALS))' ] ||
-	   ! $(PODMAN) image exists '$(PODMAN_AGENT_IMAGE)'; then
-	  agent_version="`$(get-agent-release)`"
-	  $(PODMAN) image build --tag='$(PODMAN_AGENT_IMAGE)' \
-	    --label=local.devkit.image.kind=agent-base \
-	    --label=local.devkit.base.agent=$(AGENT) \
-	    --label=local.devkit.base.agent.version="$$agent_version" \
-	    --build-arg=DEVKIT_AGENT_VERSION="$$agent_version" \
-	    $(PODMAN_BASE_BUILD_ARGS) --force-rm --format=docker --file=- <<-'EOF'
-	    FROM docker.io/library/ubuntu:latest
-	    USER root
-	    ENV DEBIAN_FRONTEND=noninteractive
-	    ENV PATH=/home/user/bin:/home/user/.local/bin:/root/bin:/root/.local/bin:$$PATH
-	    SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
-	    RUN mkdir -p -- /.devkit
-	    RUN printf >/.devkit/entry '%s\n' \
-	    '#!/bin/bash -efu' \
-	    '[ ! -d /.devkit/hooks.d ] || run-parts --lsbsysinit --arg=start /.devkit/hooks.d' \
-	    'exec "$$@"'; \
-	    chmod 755 /.devkit/entry
-	    RUN min="`sed -ne 's,^UID_MIN[[:space:]]*,,p' /etc/login.defs`"; getent passwd | while IFS=: read -r name _ uid _; do [ "$$uid" -lt "$$min" ] || userdel -rf "$$name"; done
-	    RUN groupadd -g "$(GID)" user; useradd --uid="$(UID)" --gid="$(GID)" -d /home/user -m user
-	    RUN mkdir -p -- /home/user/.config /home/user/.local/{bin,lib,state,share}
-	    RUN chown -R '$(UID):$(GID)' /home/user
-	    $(call ubuntu-install,$(COREPKGS))
-	    $(if $(AGENTPKGS),$(call ubuntu-install,$(AGENTPKGS)))
-	    RUN find /root -type d | xargs -r chmod -R g+rx,o+rx
-	    ARG DEVKIT_AGENT_VERSION
-	    RUN : "$$DEVKIT_AGENT_VERSION"; $(run.install.$(INST))
-	    SHELL ["/bin/bash", "-eio", "pipefail", "-c"]
-	    RUN bin="`command -v $(BIN)`" && [ -x "$$bin" ] && { [ "$$bin" = "/usr/local/bin/agent" ] || ln -vs -- "$$bin" "/usr/local/bin/agent"; }
-	    SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+_create-image-ubuntu:
+	$(Q)set -e --;
+	build_dir="$$(mktemp -d)";
+	trap 'rm -rf -- "$$build_dir"' EXIT;
+	trap 'exit 1' HUP INT TERM;
+	cat >"$$build_dir/release" <<-'EOF'
+	set -e
+	$(get-agent-release)
 	EOF
-	fi
-
-_create-image-ubuntu: _create-baseimage-ubuntu
-	$(Q)set -e --; image=
-	if [ -z '$(filter upgrade,$(MAKECMDGOALS))' ]; then
-	  image="`$(PODMAN) image list --filter label=local.devkit.hash=$(SHAHASH) --format '{{.Id}}' | head -1`"
-	fi
-	current="`$(PODMAN) image list --filter 'reference=$(PODMAN_IMAGE)' --format '{{.Id}}' | head -1`"
-	if [ -n "$$image" ]; then
-	  if [ "$$current" != "$$image" ]; then
-	    [ -z "$$current" ] || $(PODMAN) image untag '$(PODMAN_IMAGE)'
-	    $(PODMAN) image tag "$$image" '$(PODMAN_IMAGE)'
-	  fi
-	  exit
-	fi
-	agent_version="`$(PODMAN) image inspect \
-	  --format '{{index .Labels "local.devkit.base.agent.version"}}' \
-	  '$(PODMAN_AGENT_IMAGE)'`"
-	$(PODMAN) image build --tag="$(PODMAN_IMAGE)" \
-	  --label=local.devkit.image.kind=project \
-	  --label=local.devkit.agent=$(AGENT) \
-	  --label=local.devkit.agent.version="$$agent_version" \
-	  --label=local.devkit.build.id=$(BUILD_ID) \
-	  --label=local.devkit.hash=$(SHAHASH) \
-	  --build-arg=DEVKIT_BUILD_ID="$(BUILD_ID)" \
-	  $(addprefix --volume=,$(BUILD_VOLUMES)) \
-	  $(PODMAN_BUILD_ARGS) --force-rm --format=docker --file=- <<-'EOF'
-	  FROM $(PODMAN_AGENT_IMAGE)
-	  USER root
-	  $(if $(PODMAN_PATH),ENV PATH=$(subst $(SPACE),:,$(PODMAN_PATH)):$$PATH)
-	  $(if $(USERPKGS),$(call ubuntu-install,$(USERPKGS)))
-	  $(foreach cmd,$(SUBCMDS),\
-	    $(if $($(cmd)_ENABLED),# <<< Section for $(cmd)
-	      $(call ubuntu-install,$($(cmd).PKGS))
-	      $($(cmd).BUILD)
-	      # >>>))
-	  SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
-	  ARG DEVKIT_BUILD_ID
-	  RUN : "$$DEVKIT_BUILD_ID"; $(BUILD_COMMAND)
-	  ENTRYPOINT ["/.devkit/entry","/usr/local/bin/agent"]
+	cat >"$$build_dir/base" <<-'EOF'
+	FROM docker.io/library/ubuntu:latest
+	USER root
+	ENV DEBIAN_FRONTEND=noninteractive
+	ENV PATH=/home/user/bin:/home/user/.local/bin:/root/bin:/root/.local/bin:$$PATH
+	SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+	RUN mkdir -p -- /.devkit
+	RUN printf >/.devkit/entry '%s\n' \
+	'#!/bin/bash -efu' \
+	'[ ! -d /.devkit/hooks.d ] || run-parts --lsbsysinit --arg=start /.devkit/hooks.d' \
+	'exec "$$@"'; \
+	chmod 755 /.devkit/entry
+	RUN min="`sed -ne 's,^UID_MIN[[:space:]]*,,p' /etc/login.defs`"; getent passwd | while IFS=: read -r name _ uid _; do [ "$$uid" -lt "$$min" ] || userdel -rf "$$name"; done
+	RUN groupadd -g "$(GID)" user; useradd --uid="$(UID)" --gid="$(GID)" -d /home/user -m user
+	RUN mkdir -p -- /home/user/.config /home/user/.local/{bin,lib,state,share}
+	RUN chown -R '$(UID):$(GID)' /home/user
+	$(call ubuntu-install,$(COREPKGS))
+	$(if $(AGENTPKGS),$(call ubuntu-install,$(AGENTPKGS)))
+	RUN find /root -type d | xargs -r chmod -R g+rx,o+rx
+	ARG DEVKIT_AGENT_VERSION
+	RUN : "$$DEVKIT_AGENT_VERSION"; $(run.install.$(INST))
+	SHELL ["/bin/bash", "-eio", "pipefail", "-c"]
+	RUN bin="`command -v $(BIN)`" && [ -x "$$bin" ] && { [ "$$bin" = "/usr/local/bin/agent" ] || ln -vs -- "$$bin" "/usr/local/bin/agent"; }
+	SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
 	EOF
+	cat >"$$build_dir/project" <<-'EOF'
+	ARG DEVKIT_BASE_IMAGE
+	FROM $${DEVKIT_BASE_IMAGE}
+	USER root
+	$(if $(PODMAN_PATH),ENV PATH=$(subst $(SPACE),:,$(PODMAN_PATH)):$$PATH)
+	$(if $(USERPKGS),$(call ubuntu-install,$(USERPKGS)))
+	$(foreach cmd,$(SUBCMDS),\
+	  $(if $($(cmd)_ENABLED),# <<< Section for $(cmd)
+	    $(call ubuntu-install,$($(cmd).PKGS))
+	    $($(cmd).BUILD)
+	    # >>>))
+	SHELL ["/bin/bash", "-eo", "pipefail", "-c"]
+	ARG DEVKIT_BUILD_ID
+	RUN : "$$DEVKIT_BUILD_ID"; $(BUILD_COMMAND)
+	ENTRYPOINT ["/.devkit/entry","/usr/local/bin/agent"]
+	EOF
+	sh '$(DEVKIT_WORKDIR)/scripts/build-image.sh' \
+	  '$(PODMAN)' '$(AGENT)' '$(PODMAN_AGENT_IMAGE)' '$(PODMAN_IMAGE)' \
+	  '$(SHAHASH)' '$(VERSION)' '$(VENDOR)' '$(filter upgrade,$(MAKECMDGOALS))' \
+	  "$$build_dir" --label='local.devkit.build.id=$(BUILD_ID)' \
+	  --build-arg='DEVKIT_BUILD_ID=$(BUILD_ID)' \
+	  $(addprefix --volume=,$(BUILD_VOLUMES)) $(PODMAN_BUILD_ARGS)
 
 PASSTHRU_SHELL_ARGS = i=0; while [ $$i -lt $${NARGS:-0} ]; do eval "a=\"\$${ARG$$i-}\""; set -- "$$@" "$$a"; i=$$(($$i+1)); done
 
@@ -384,7 +359,7 @@ clean-all:
 clean:
 	$(Q)$(PODMAN) image list --format '{{.Id}}' --filter 'reference=$(PODMAN_IMAGE)' | xargs -r $(PODMAN) image rm -f
 
-upgrade: clean _create-image-$(VENDOR)
+upgrade: _create-image-$(VENDOR)
 
 list:
 	$(Q)$(PODMAN) image list --filter label=local.devkit.agent
