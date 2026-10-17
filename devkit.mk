@@ -78,6 +78,7 @@ EDITOR   = $(shell $(GIT_CONFIG_GET)     devkit.editor   || echo /usr/bin/editor
 HOOKS    = $(shell $(GIT_CONFIG_GET)     devkit.hooks-path)
 DEVPKGS  = $(shell $(GIT_CONFIG_GET_ALL) devkit.packages)
 VOLUMES  = $(shell $(GIT_CONFIG_GET_ALL) devkit.volumes)
+ENVS     = $(shell $(GIT_CONFIG_GET_ALL) devkit.env)
 ENVFILES = $(shell $(GIT_CONFIG_GET_ALL) devkit.env-file)
 CAPS     = $(shell $(GIT_CONFIG_GET_ALL) devkit.caps)
 
@@ -148,6 +149,7 @@ PODMAN_ARGS = \
 	--user='$(if $(ROOT),root,$(UID):$(GID))' \
 	--workdir='$(WORKDIR)'
 PODMAN_RUNTIME_ARGS = $(PODMAN_ARGS) \
+	$(addprefix --env=,$(ENVS)) \
 	$(addprefix --env-file=,$(ENVFILES)) \
 	$(addprefix --cap-del=,$(patsubst -%,%,$(filter -%,$(CAPS)))) \
 	$(addprefix --cap-add=,$(patsubst +%,%,$(filter +%,$(CAPS)))) \

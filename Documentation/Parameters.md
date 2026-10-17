@@ -125,6 +125,18 @@ git config --add devkit.env-file .env
 git config --add devkit.env-file .env.local
 ```
 
+## devkit.env
+
+Additional list of environment variables to pass to the container at runtime.
+This list is vulnerable to values containing spaces or special characters that
+require quoting. In these cases, use `devkit.env-file`.
+
+Example:
+
+```sh
+git config --add devkit.env OPENCODE_BROWSER_AGENT_SOCKET=/tmp/opencode.sock
+```
+
 ## devkit.caps
 
 A list of capabilities to be added or removed. Caps beginning with `+` will be
