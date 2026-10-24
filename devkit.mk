@@ -4,7 +4,7 @@
 
 CURFILE := $(lastword $(MAKEFILE_LIST))
 PROG ?= make -f $(CURFILE) --
-VERSION = 6
+VERSION = 8
 DEVKIT_WORKDIR = $(realpath $(dir $(CURFILE)))
 normalize-repo = $(if $(filter %/,$(1)),$(call normalize-repo,$(patsubst %/,%,$(1))),$(1))
 export DEVKIT_INSTALLED_REPO := $(call normalize-repo,$(or $(shell cat -- "$(DEVKIT_WORKDIR)/.devkit-repo" 2>/dev/null),https://github.com/devkit-dev/devkit))
