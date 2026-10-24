@@ -198,8 +198,9 @@ repository configuration: if it differs from the saved image, normal
 rebuilding may select the current shared base again.
 
 Rollback fails without changing tags if no valid saved image/base pair
-exists. Upgrades require resolvable version and base metadata on the
-current image before replacing it, so rollback history can be retained.
+exists. Upgrades retain the current image for rollback when its version
+and base metadata are valid. If they are not, the upgrade proceeds without
+replacing the existing rollback history.
 
 Remove images for current environment:
 

@@ -66,16 +66,14 @@ history_changed=
 previous_project=
 previous_base=
 if [ -n "$upgrade" ] && [ -n "$current" ]; then
-	if ! validate_project "$current"; then
-		echo "devkit: cannot retain rollback: current image has unresolved version/base metadata." >&2
-		exit 1
-	fi
-	outgoing_version=$validated_version
-	outgoing_base=$validated_base
-	if [ "$outgoing_version" != "$agent_version" ]; then
-		history_changed=yes
-		previous_project=$(find_image --filter "reference=$rollback_tag")
-		previous_base=$(find_image --filter "reference=$rollback_base_tag")
+	if validate_project "$current"; then
+		outgoing_version=$validated_version
+		outgoing_base=$validated_base
+		if [ "$outgoing_version" != "$agent_version" ]; then
+			history_changed=yes
+			previous_project=$(find_image --filter "reference=$rollback_tag")
+			previous_base=$(find_image --filter "reference=$rollback_base_tag")
+		fi
 	fi
 fi
 
