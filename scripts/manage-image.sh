@@ -9,6 +9,7 @@ agent=$3
 base_tag=$4
 project_tag=$5
 container=$6
+legacy_container=$7
 . "${0%/*}/image-common.sh"
 
 current=$(find_image --filter "reference=$project_tag")
@@ -25,7 +26,7 @@ rollback)
 		echo "devkit: saved rollback image or base is invalid for $project_tag." >&2
 		exit 1
 	fi
-	running=$("$podman" ps --filter "name=$container" --format '{{.Names}}')
+	running=$("$podman" ps --format '{{.Names}}')
 	if [ "$current" = "$saved" ]; then
 		echo "devkit: already using the rollback image ($validated_version)."
 	else
@@ -33,8 +34,8 @@ rollback)
 		echo "devkit: restored $project_tag to $agent $validated_version."
 	fi
 	for name in $running; do
-		if [ "$name" = "$container" ]; then
-			echo "devkit: restart $container to use the restored image." >&2
+		if [ "$name" = "$container" ] || [ "$name" = "$legacy_container" ]; then
+			echo "devkit: restart $name to use the restored image." >&2
 		fi
 	done
 	;;

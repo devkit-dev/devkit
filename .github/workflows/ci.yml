@@ -19,6 +19,8 @@ jobs:
           sh -n devkit.sh
           sh -n tests/install.sh
           sh tests/install.sh
+          sh -n tests/container.sh
+          sh tests/container.sh
 
   checks:
     runs-on: ubuntu-latest
