@@ -293,14 +293,16 @@ Supported agents:
 - [claude](https://claude.ai)
 - [codex](https://github.com/openai/codex)
 - [copilot](https://github.com/github/copilot-cli)
+- [crush](https://github.com/charmbracelet/crush)
 - [cursor](https://cursor.com/docs/agent/overview)
 - [gemini](https://geminicli.com)
 - [goose](https://github.com/aaif-goose/goose)
+- [grok (unofficial)](https://grokcli.io)
+- [kimi](https://moonshotai.github.io/kimi-code/en/)
 - [opencode](https://opencode.ai)
 - [pi](https://pi.dev)
-- [grok (unofficial)](https://grokcli.io)
+- [qwen](https://github.com/QwenLM/qwen-code)
 - [vibe](https://docs.mistral.ai/mistral-vibe/terminal)
-- [kimi](https://moonshotai.github.io/kimi-code/en/)
 
 See [Documentation/Parameters.md](Documentation/Parameters.md) for the full
 list of supported `devkit.*` parameters. These parameters are read from the
