@@ -123,12 +123,15 @@ include $(DEVKIT_WORKDIR)/agents/$(AGENT).mk
 UID := $(shell id -u)
 GID := $(shell id -g)
 
-ifneq ($(filter shell,$(MAKECMDGOALS)),)
+ifneq ($(filter _start-shell,$(MAKECMDGOALS)),)
 PODMAN_ENTRYPOINT := --entrypoint='["/.devkit/entry","$(DEVSHELL)"]'
 endif
 
-ifneq ($(filter exec,$(MAKECMDGOALS)),)
+ifneq ($(filter _start-exec,$(MAKECMDGOALS)),)
 PODMAN_ENTRYPOINT := --entrypoint='["/.devkit/entry"]'
+endif
+
+ifneq ($(filter exec _start-exec,$(MAKECMDGOALS)),)
 DEVSHELL :=
 endif
 
@@ -161,6 +164,7 @@ PODMAN_VOLUMES = \
 	$(addprefix --volume=,$(VOLUMES))
 
 PODMAN_CONTAINER = $(AGENT)-for-$(PODMAN_PROJNAME)
+PODMAN_ACTIVE_CONTAINER = devkit-$(PODMAN_PROJNAME)
 PODMAN_AGENT_IMAGE = localhost/devkit/base/$(AGENT):latest
 PODMAN_IMAGE = localhost/devkit/$(PODMAN_PROJNAME):$(AGENT)
 PODMAN_PATH =
@@ -343,19 +347,40 @@ _create-image-ubuntu:
 
 PASSTHRU_SHELL_ARGS = i=0; while [ $$i -lt $${NARGS:-0} ]; do eval "a=\"\$${ARG$$i-}\""; set -- "$$@" "$$a"; i=$$(($$i+1)); done
 
-run: _check-self-upgrade _create_local_dirs _create-image-$(VENDOR)
+ACTIVE_CONTAINER = sh '$(DEVKIT_WORKDIR)/scripts/active-container.sh' '$(PODMAN)' '$(PODMAN_PROJNAME)'
+
+run:
+	$(Q)set -e --;
+	running="$$($(ACTIVE_CONTAINER))";
+	if [ -n "$$running" ]; then
+	  echo "devkit: repo $(PODMAN_PROJNAME) already has a running container: $$running" >&2;
+	  exit 1;
+	fi
+	$(MAKE) --no-print-directory -f '$(CURFILE)' _start-run
+
+shell exec:
 	$(Q)set -e --; $(PASSTHRU_SHELL_ARGS);
-	if ! $(PODMAN) container exists '$(PODMAN_CONTAINER)'; then
-	  $(PODMAN) container run $(PODMAN_RUNTIME_ARGS) $(PODMAN_VOLUMES) \
-	    --name '$(PODMAN_CONTAINER)' --log-driver=none \
-	    $(PODMAN_ENTRYPOINT) -- '$(PODMAN_IMAGE)' "$$@" $(ARGS);
+	running="$$($(ACTIVE_CONTAINER))";
+	if [ -z "$$running" ]; then
+	  $(MAKE) --no-print-directory -f '$(CURFILE)' _start-$@;
 	else
-	  $(PODMAN) container exec $(PODMAN_ARGS) \
-	    -- '$(PODMAN_CONTAINER)' $(DEVSHELL) "$$@" $(ARGS);
+	  $(PODMAN) container exec $(PODMAN_ARGS) -- "$$running" $(DEVSHELL) "$$@" $(ARGS);
 	fi
 
-shell: run
-exec: run
+_start-run _start-shell _start-exec: _check-self-upgrade _create_local_dirs _create-image-$(VENDOR)
+	$(Q)set -e --; $(PASSTHRU_SHELL_ARGS);
+	running="$$($(ACTIVE_CONTAINER))";
+	if [ -n "$$running" ]; then
+	  case '$@' in
+	    _start-run) echo "devkit: repo $(PODMAN_PROJNAME) already has a running container: $$running" >&2; exit 1 ;;
+	    *) $(PODMAN) container exec $(PODMAN_ARGS) -- "$$running" $(DEVSHELL) "$$@" $(ARGS); exit ;;
+	  esac;
+	fi;
+	$(PODMAN) container run $(PODMAN_RUNTIME_ARGS) $(PODMAN_VOLUMES) \
+	  --name '$(PODMAN_ACTIVE_CONTAINER)' --log-driver=none \
+	  $(PODMAN_ENTRYPOINT) -- '$(PODMAN_IMAGE)' "$$@" $(ARGS)
+
+.PHONY: _start-run _start-shell _start-exec
 
 clean-all:
 	$(Q)set -e --;
@@ -365,7 +390,7 @@ clean-all:
 clean rollback:
 	$(Q)sh '$(DEVKIT_WORKDIR)/scripts/manage-image.sh' '$@' \
 	  '$(PODMAN)' '$(AGENT)' '$(PODMAN_AGENT_IMAGE)' '$(PODMAN_IMAGE)' \
-	  '$(PODMAN_CONTAINER)'
+	  '$(PODMAN_ACTIVE_CONTAINER)' '$(PODMAN_CONTAINER)'
 
 upgrade: _create-image-$(VENDOR)
 

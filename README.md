@@ -51,9 +51,10 @@ configuration directory is mounted from the host, and any configured volumes are
 added. The image entrypoint runs container `start` hooks and then replaces
 itself with the requested command: either the agent or the development shell.
 
-If the named container is already running, `devkit shell` opens another session
-inside it instead of creating a second container. This keeps long-running agent
-sessions and interactive debugging in the same project environment.
+The container name is shared by all agents for that repository. While it is
+running, another `devkit run` is refused. `devkit shell` and `devkit exec`
+open sessions inside it, even if the configured agent has changed. A shell
+started without an agent also reserves the repository until it exits.
 
 ## Requirements
 
@@ -132,8 +133,8 @@ Run agent:
 $ devkit run
 ```
 
-Open interactive shell. If the container is already running, a second session
-will be opened in the container:
+Open an interactive shell. If a container is already running for the
+repository, a second session opens inside it:
 
 ```
 $ devkit shell
