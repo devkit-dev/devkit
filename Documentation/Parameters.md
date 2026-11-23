@@ -146,6 +146,21 @@ git config --add devkit.env OPENCODE_BROWSER_AGENT_SOCKET=/tmp/opencode.sock
 A list of capabilities to be added or removed. Caps beginning with `+` will be
 added, and those beginning with `-` will be removed.
 
+## devkit.run-arg
+
+Additional Podman options for starting the agent container. Repeat this
+setting to append options in order, after devkit's run options and
+before the image name. The host shell parses these values. Use trusted
+Git config and store quotes around values containing spaces or wildcards.
+
+```sh
+git config --local --add devkit.run-arg "--security-opt='unmask=/proc/*'"
+git config --local --add devkit.run-arg "--annotation='note=hello world'"
+```
+
+Conflicting options can break container startup or devkit's container
+management. Changes take effect when devkit starts a new agent container.
+
 ## devkit.hooks-path
 
 Path to a directory with container lifecycle hooks.

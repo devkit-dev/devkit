@@ -77,6 +77,7 @@ DEVSHELL = $(shell $(GIT_CONFIG_GET)     devkit.shell    || echo /bin/bash)
 EDITOR   = $(shell $(GIT_CONFIG_GET)     devkit.editor   || echo /usr/bin/editor)
 HOOKS    = $(shell $(GIT_CONFIG_GET)     devkit.hooks-path)
 DEVPKGS  = $(shell $(GIT_CONFIG_GET_ALL) devkit.packages)
+PODMAN_RUN_ARGS = $(shell $(GIT_CONFIG_GET_ALL) devkit.run-arg)
 VOLUMES  = $(shell $(GIT_CONFIG_GET_ALL) devkit.volumes)
 ENVS     = $(shell $(GIT_CONFIG_GET_ALL) devkit.env)
 ENVFILES = $(shell $(GIT_CONFIG_GET_ALL) devkit.env-file)
@@ -371,7 +372,7 @@ _start-run _start-shell _start-exec: _check-self-upgrade _create_local_dirs _cre
 	$(Q)set -e --; $(PASSTHRU_SHELL_ARGS);
 	$(PODMAN) container run $(PODMAN_RUNTIME_ARGS) $(PODMAN_VOLUMES) \
 	  --name '$(PODMAN_ACTIVE_CONTAINER)' --log-driver=none \
-	  $(PODMAN_ENTRYPOINT) -- '$(PODMAN_IMAGE)' "$$@" $(ARGS)
+	  $(PODMAN_ENTRYPOINT) $(PODMAN_RUN_ARGS) -- '$(PODMAN_IMAGE)' "$$@" $(ARGS)
 
 .PHONY: _start-run _start-shell _start-exec
 
